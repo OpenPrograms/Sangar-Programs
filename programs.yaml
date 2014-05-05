@@ -1,0 +1,9 @@
+holo flow:
+	/blob/master/holo-flow.lua
+	Creates a terrain like hologram
+holo text:
+	/blob/master/holo-text.lua
+	Makes scrolling text above terrain
+noise:
+	/blob/master/noise.lua
+	Perlin noise and more API
