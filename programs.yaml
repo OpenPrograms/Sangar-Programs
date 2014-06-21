@@ -1,9 +1,15 @@
-holo flow:
+geo-scan:
+  /blob/master/geo-scan.lua
+  Creates a holographic image of the surrounding area.
+holo-flow:
 	/blob/master/holo-flow.lua
-	Creates a terrain like hologram
-holo text:
+	Creates a scrolling, terrain like hologram.
+holo-text:
 	/blob/master/holo-text.lua
-	Makes scrolling text above terrain
+	Displays scrolling text above a random heightmap.
+midi:
+  /blob/master/midi.lua
+  Plays midi files to Note Blocks or using the built-in speaker.
 noise:
 	/blob/master/noise.lua
-	Perlin noise and more API
+	Perlin noise and more.
