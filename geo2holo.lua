@@ -4,7 +4,7 @@ if not component.isAvailable("geolyzer") then
   return
 end
 if not component.isAvailable("hologram") then
-  io.stderr:write("This program requires a Hologram to run.")
+  io.stderr:write("This program requires a T2 Hologram Projector to run.")
   return
 end
 
