@@ -7,6 +7,7 @@ local holo = component.hologram
 local keyboard = require("keyboard")
 print("Press Ctrl+W to stop")
 
+holo.clear()
 local i = 0
 while true do
   os.sleep(0.1)
