@@ -19,3 +19,6 @@ midi:
 noise:
 	/blob/master/noise.lua
 	Perlin noise and more.
+lisp:
+  /blob/master/lisp.lua
+  Simple Lisp REPL and interpreter.
