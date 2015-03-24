@@ -5,8 +5,12 @@ local printer = component.printer3d
 
 local args = shell.parse(...)
 if #args < 1 then
-  io.write("Usage: print3d FILE\n")
+  io.write("Usage: print3d FILE [count]\n")
   os.exit(0)
+end
+local count = 1
+if #args > 1 then
+  count = tonumber(args[2])
 end
 
 local file, reason = io.open(args[1], "r")
@@ -46,7 +50,7 @@ for _, shape in ipairs(data.shapes or {}) do
   printer.addShape(shape[1], shape[2], shape[3], shape[4], shape[5], shape[6], shape.texture, shape.state)
 end
 
-local result, reason = printer.commit()
+local result, reason = printer.commit(count)
 if result then
   io.write("Job successfully committed!\n")
 else
