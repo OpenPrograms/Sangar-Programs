@@ -1,0 +1,20 @@
+{
+  label = "Big Button",
+  emitRedstone = true, -- if this is false it behaves like a door
+  buttonMode = true, -- if this is false it behaves like a lever
+  shapes={
+    {1,1,14,15,15,16,texture="lapis_block"},
+    {4,10,13,6,12,14,texture="sandstone_top"},
+    {10,10,13,12,12,14,texture="sandstone_top"},
+    {2,4,13,4,6,14,texture="sandstone_top"},
+    {12,4,13,14,6,14,texture="sandstone_top"},
+    {4,2,13,12,4,14,texture="sandstone_top"},
+
+    {1,1,14,15,15,16,texture="lapis_block",state=true},
+    {4,10,13,6,12,14,texture="sandstone_top",state=true},
+    {10,10,13,12,12,14,texture="sandstone_top",state=true},
+    {2,2,13,4,4,14,texture="sandstone_top",state=true},
+    {12,2,13,14,4,14,texture="sandstone_top",state=true},
+    {4,4,13,12,6,14,texture="sandstone_top",state=true}
+  }
+}

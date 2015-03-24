@@ -1,0 +1,12 @@
+{
+  label = "Pot",
+  tooltip = "§7A slightly larger but useless flower pot.",
+  shapes={
+    {0,0,0,16,2,16,texture="brick"},
+    {0,2,0,2,12,16,texture="brick"},
+    {14,2,0,16,12,16,texture="brick"},
+    {2,2,0,14,12,2,texture="brick"},
+    {2,2,14,14,12,16,texture="brick"},
+    {2,2,2,14,10,14,texture="dirt"}
+  }
+}

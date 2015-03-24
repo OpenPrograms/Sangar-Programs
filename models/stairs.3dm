@@ -1,0 +1,7 @@
+{
+  label = "Stone Brick Stairs",
+  shapes = {
+    {0, 0, 0, 16, 8, 16, texture = "stonebrick"},
+    {0, 8, 8, 16, 16, 16, texture = "stonebrick"}
+  }
+}

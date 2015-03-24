@@ -1,0 +1,4 @@
+{
+  label = "Oak Wood Slab",
+  shapes={{0,0,0,16,8,16,texture="planks_oak"}}
+}

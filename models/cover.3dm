@@ -1,0 +1,5 @@
+{
+  label = "Cover",
+  tooltip = "§7A simple cover.",
+  shapes={{0,0,0,16,4,16,texture="planks_oak"}}
+}
