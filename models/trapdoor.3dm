@@ -1,0 +1,4 @@
+{shapes={
+  {0,13,0,16,16,16,texture="trapdoor"},
+  {0,0,13,16,16,16,texture="trapdoor",state=true}
+}}
