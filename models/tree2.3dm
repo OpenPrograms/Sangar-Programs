@@ -1,0 +1,7 @@
+{shapes={
+  {7,0,7,9,8,9,texture="log_oak"},
+  {3,6,3,13,10,13,texture="leaves_oak",tint=0x48B518},
+  {5,10,5,11,12,11,texture="leaves_oak",tint=0x48B518},
+  {5,12,7,11,14,9,texture="leaves_oak",tint=0x48B518},
+  {7,12,5,9,14,11,texture="leaves_oak",tint=0x48B518}
+}}

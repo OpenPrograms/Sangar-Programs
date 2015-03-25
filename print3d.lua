@@ -47,7 +47,7 @@ if data.buttonMode then
 end
 io.write("Adding " .. #data.shapes .. " shapes.\n")
 for _, shape in ipairs(data.shapes or {}) do
-  printer.addShape(shape[1], shape[2], shape[3], shape[4], shape[5], shape[6], shape.texture, shape.state)
+  printer.addShape(shape[1], shape[2], shape[3], shape[4], shape[5], shape[6], shape.texture, shape.state, shape.tint)
 end
 
 local result, reason = printer.commit(count)
