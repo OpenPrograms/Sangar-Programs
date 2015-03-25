@@ -29,7 +29,7 @@
                              The default is false. ]]
                           
   -- This is the list of shapes defining how the model looks. There has to be
-  -- at least one shape for the models inactive state for the model to be
+  -- at least one shape for the model's inactive state for the model to be
   -- valid. Shapes cannot be "flat", i.e. they have to have a volume. In other
   -- words, the minimum and maximum coordinate on a single axis must not be
   -- identical.
