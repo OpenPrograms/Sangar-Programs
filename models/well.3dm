@@ -1,0 +1,14 @@
+{shapes={
+  {0,0,0,16,2,16,texture="sand"},
+  {0,2,0,6,4,6,texture="sand"},
+  {10,2,0,16,4,6,texture="sand"},
+  {0,2,10,6,4,16,texture="sand"},
+  {10,2,10,16,4,16,texture="sand"},
+  {3,4,3,6,10,6,texture="sand"},
+  {10,4,3,13,10,6,texture="sand"},
+  {3,4,10,6,10,13,texture="sand"},
+  {10,4,10,13,10,13,texture="sand"},
+  {3,10,3,13,12,13,texture="sand"},
+  {6,12,6,10,14,10,texture="sand"},
+  {3,2,3,13,4,13,texture="water_still"}
+}}
