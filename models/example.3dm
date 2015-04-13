@@ -8,6 +8,14 @@
   -- tooltip. If this is not set, the item won't have a detailed tooltip.
   tooltip = "This is an example model, demonstrating all the features.",
 
+  lightLevel = 0,       --[[ The amount of light the printed block should emit.
+                             By default, values in the interval [0,8] are
+                             possible. To create blocks with a higher light
+                             level, craft the printed block with some glowstone
+                             dust, allowing them to reach up to the maximum
+                             light level, 15. This is only available in
+                             OpenComputers version 1.5.7 and later. ]]
+
   emitRedstone = false, --[[ If this is false it behaves like a door, i.e.
                              it switches to the model's active state when
                              a redstone signal goes into the block - if there
@@ -16,7 +24,13 @@
                              i.e. it emits a redstone signal when in its active
                              state (set via a player right-clicking the block).
                              It will not react to redstone if it is an emitter.
-                             The default is false. ]]
+                             The default is false.
+                             Starting with version 1.5.7 of OpenComputers, it is
+                             also possible to provide a number in the interval
+                             [0,15] here, where 0 is equivalent to `false`, and
+                             15 is equivalent to `true`. Arbitrary output
+                             signal strength, i.e. values other than 0 or 15,
+                             will require more material to print. ]]
 
   buttonMode = false,   --[[ If this is false, the model behaves like a door or
                              lever, i.e. it will remain in its active state

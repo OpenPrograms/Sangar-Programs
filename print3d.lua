@@ -28,31 +28,41 @@ if not data then
 end
 data = data()
 
+io.write("Configuring...\n")
+
 printer.reset()
 if data.label then
-  io.write("Setting label to: '" .. data.label .. "'\n")
   printer.setLabel(data.label)
 end
 if data.tooltip then
-  io.write("Setting tooltip to: '" .. data.tooltip .. "'\n")
   printer.setTooltip(data.tooltip)
 end
+if data.lightLevel then
+  printer.setLightLevel(data.lightLevel)
+end
 if data.emitRedstone then
-  io.write("Setting block to " .. (data.emitRedstone and "" or "not ") .. "emit redstone when toggled.\n")
   printer.setRedstoneEmitter(data.emitRedstone)
 end
 if data.buttonMode then
-  io.write("Setting button mode to: " .. tostring(data.buttonMode) .. ".\n")
   printer.setButtonMode(data.buttonMode)
 end
-io.write("Adding " .. #data.shapes .. " shapes.\n")
-for _, shape in ipairs(data.shapes or {}) do
-  printer.addShape(shape[1], shape[2], shape[3], shape[4], shape[5], shape[6], shape.texture, shape.state, shape.tint)
+for i, shape in ipairs(data.shapes or {}) do
+  local result, reason = printer.addShape(shape[1], shape[2], shape[3], shape[4], shape[5], shape[6], shape.texture, shape.state, shape.tint)
+  if not result then
+    io.write("Failed adding shape: " .. tostring(reason) .. "\n")
+  end
 end
+
+io.write("Label: '" .. (printer.getLabel() or "not set") .. "'\n")
+io.write("Tooltip: '" .. (printer.getTooltip() or "not set") .. "'\n")
+io.write("Light level: " .. printer.getLightLevel() .. "\n")
+io.write("Redstone level: " .. select(2, printer.isRedstoneEmitter()) .. "\n")
+io.write("Button mode: " .. tostring(printer.isButtonMode()) .. "\n")
+io.write("Shapes: " .. printer.getShapeCount() .. " inactive, " .. select(2, printer.getShapeCount()) .. " active\n")
 
 local result, reason = printer.commit(count)
 if result then
   io.write("Job successfully committed!\n")
 else
-  io.stderr:write("Failed committing job: " .. reason .. "\n")
+  io.stderr:write("Failed committing job: " .. tostring(reason) .. "\n")
 end
