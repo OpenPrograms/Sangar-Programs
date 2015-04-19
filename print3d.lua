@@ -37,7 +37,7 @@ end
 if data.tooltip then
   printer.setTooltip(data.tooltip)
 end
-if data.lightLevel then
+if data.lightLevel and printer.setLightLevel then -- as of OC 1.5.7
   printer.setLightLevel(data.lightLevel)
 end
 if data.emitRedstone then
@@ -55,7 +55,9 @@ end
 
 io.write("Label: '" .. (printer.getLabel() or "not set") .. "'\n")
 io.write("Tooltip: '" .. (printer.getTooltip() or "not set") .. "'\n")
-io.write("Light level: " .. printer.getLightLevel() .. "\n")
+if printer.getLightLevel then -- as of OC 1.5.7
+  io.write("Light level: " .. printer.getLightLevel() .. "\n")
+end
 io.write("Redstone level: " .. select(2, printer.isRedstoneEmitter()) .. "\n")
 io.write("Button mode: " .. tostring(printer.isButtonMode()) .. "\n")
 io.write("Shapes: " .. printer.getShapeCount() .. " inactive, " .. select(2, printer.getShapeCount()) .. " active\n")
