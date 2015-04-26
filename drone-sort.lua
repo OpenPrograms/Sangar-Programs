@@ -33,7 +33,9 @@ local function moveTo(x, y, z)
   end
   local rx, ry, rz = x - px, y - py, z - pz
   drone.move(rx, ry, rz)
-  repeat until drone.getOffset() < 0.5 and drone.getVelocity() < 0.5
+  while drone.getOffset() > 0.5 or drone.getVelocity() > 0.5 do
+    computer.pullSignal(0.5)
+  end
   px, py, pz = x, y, z
 end
 
