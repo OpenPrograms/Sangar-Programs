@@ -7,7 +7,7 @@ if #args < 1 then
 end
 local count = 1
 if #args > 1 then
-  count = tonumber(args[2])
+  count = assert(tonumber(args[2]), tostring(args[2]) .. " is not a valid count")
 end
 
 local file = fs.open(args[1], "r")
