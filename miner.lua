@@ -77,7 +77,7 @@ end
 
 -- We can automatically place torches while moving; this keeps track of the
 -- state, so we can place every n blocks.
-local placingTorches, torchState = false, 10, 0
+local placingTorches, torchState = false, 0
 
 -- Start automatically placing torches in the configured interval.
 local function beginPlacingTorches()
@@ -495,7 +495,6 @@ local function digMainShaft(length)
   local top, count = getTop()
 
   if not (dig1x3(length) and
-          placeTorch() and
           pushTurn(left) and
           dig1x3(1) and
           pushTurn(left) and
@@ -512,7 +511,8 @@ local function digMainShaft(length)
 
   if not (dig1x3(1) and
           pushTurn(left) and
-          dig1x3(length - 1))
+          dig1x3(length - 1) and
+          placeTorch())
   then
     return false
   end
