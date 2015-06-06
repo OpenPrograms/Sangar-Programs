@@ -17,16 +17,18 @@ for x=ox,sx+ox do
     local hx, hz = 1 + x - ox, 1 + z - oz
     local column = component.geolyzer.scan(x, z)
     for y=1,32 do
-      local hardness = column[y + 27]
-      local color
-      if hardness == 0 or not hardness then
-        color = 0
-      elseif hardness < 3 then
-        color = 2
-      elseif hardness < 100 then
-        color = 1
-      else
-        color = 3
+      local color = 0
+      if column then
+        local hardness = column[y + 27]
+        if hardness == 0 or not hardness then
+          color = 0
+        elseif hardness < 3 then
+          color = 2
+        elseif hardness < 100 then
+          color = 1
+        else
+          color = 3
+        end
       end
       if component.hologram.maxDepth() > 1 then
         component.hologram.set(hx, y, hz, color)
