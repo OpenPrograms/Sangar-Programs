@@ -73,47 +73,25 @@ local function findTorchSlot()
   end
 end
 
---[[ Torching ]]---------------------------------------------------------------
-
--- We can automatically place torches while moving; this keeps track of the
--- state, so we can place every n blocks.
-local placingTorches, torchState = false, 0
-
--- Start automatically placing torches in the configured interval.
-local function beginPlacingTorches()
-  placingTorches = true
-  torchState = 0
-end
-
--- Stop automatically placing torches.
-local function stopPlacingTorches()
-  placingTorches = false
-end
-
 -- Place a single torch above the robot, if there are any torches left.
 local function placeTorch()
   local slot = findTorchSlot()
+  local result = false
   if slot then
     robot.select(slot)
-    robot.placeUp()
+    result = robot.placeUp()
     robot.select(1)
   end
-  return true
-end
-
--- Called whenever we're moving, used for automatic torch placement.
-local function onMove()
-  if placingTorches then
-    if torchState < 1 then
-      torchState = torchInverval
-      placeTorch()
-    else
-      torchState = torchState - 1
-    end
-  end
+  return result
 end
 
 --[[ Navigation ]]-------------------------------------------------------------
+
+-- Re-used to avoid spamming new closures.
+local function noop() end
+
+-- Called whenever we're moving, used for automatic torch placement an digging.
+local onMove = noop
 
 -- Quick look-up table for inverting directions.
 local oppositeSides = {
@@ -422,6 +400,34 @@ local function turnTowards(side)
   end
 end
 
+--[[ On move callbacks ]]------------------------------------------------------
+
+-- Start automatically placing torches in the configured interval.
+local function beginPlacingTorches()
+  local counter = 2
+  onMove = function()
+    if counter < 1 then
+      if placeTorch() then
+        counter = torchInverval
+      end
+    else
+      counter = counter - 1
+    end
+  end
+end
+
+-- Start digging out the block below us after each move.
+local function beginDigginTrench()
+  onMove = function()
+    dig(sides.down)
+  end
+end
+
+-- Stop automatically placing torches.
+local function clearMoveCallback()
+  onMove = noop
+end
+
 --[[ Moving ]]-----------------------------------------------------------------
 
 -- Dig out any interesting ores adjacent to the current position, recursively.
@@ -499,7 +505,7 @@ local function digMainShaft(length)
           dig1x3(1) and
           pushTurn(left) and
           dig1x3(length - 1) and
-          placeTorch() and
+          (placeTorch() or true) and -- Just keep going...
           pushTurn(left) and
           dig1x3(1))
   then
@@ -511,11 +517,11 @@ local function digMainShaft(length)
 
   if not (dig1x3(1) and
           pushTurn(left) and
-          dig1x3(length - 1) and
-          placeTorch())
+          dig1x3(length - 1))
   then
     return false
   end
+  placeTorch()
 
   -- Shortcut: manually move back to start, do an unsafe setTop.
   -- Otherwise we'd have to retrace all three rows.
@@ -553,16 +559,20 @@ local function digShafts(length)
     dig1x2(i + 2, true)
     beginPlacingTorches()
     setTop(sideTop, sideCount)
-    stopPlacingTorches()
+    clearMoveCallback()
 
     pushTurn(right) -- Dig right shaft.
     dig1x2(i + 2, true)
     beginPlacingTorches()
     setTop(sideTop, sideCount)
-    stopPlacingTorches()
+    clearMoveCallback()
   end
 
-  setTop(top, count) -- Go back to start of main shaft.
+  -- Go back to start of main shaft. Dig out the center of the main shaft
+  -- while we're at it, so we break through the ceiling between levels.
+  beginDigginTrench()
+  setTop(top, count)
+  clearMoveCallback()
 end
 
 -- Moves to the next main shaft, clockwise.
