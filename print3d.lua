@@ -46,6 +46,9 @@ end
 if data.buttonMode then
   printer.setButtonMode(data.buttonMode)
 end
+if data.collidable then
+  printer.setCollidable(not not data.collidable[1], not not data.collidable[2])
+end
 for i, shape in ipairs(data.shapes or {}) do
   local result, reason = printer.addShape(shape[1], shape[2], shape[3], shape[4], shape[5], shape[6], shape.texture, shape.state, shape.tint)
   if not result then
@@ -60,6 +63,7 @@ if printer.getLightLevel then -- as of OC 1.5.7
 end
 io.write("Redstone level: " .. select(2, printer.isRedstoneEmitter()) .. "\n")
 io.write("Button mode: " .. tostring(printer.isButtonMode()) .. "\n")
+io.write("Collidable: " .. tostring(select(1, printer.isCollidable())) .. "/" .. tostring(select(2, printer.isCollidable())) .. "\n")
 io.write("Shapes: " .. printer.getShapeCount() .. " inactive, " .. select(2, printer.getShapeCount()) .. " active\n")
 
 local result, reason = printer.commit(count)
