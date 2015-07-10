@@ -41,6 +41,15 @@
                              redstone signal or a player, i.e. it will behave
                              like a button.
                              The default is false. ]]
+
+  collidable = {true, true} --[[ Determines whether the states of the print are
+                             collidable, i.e. whether players and other
+                             entities collide with them. If false, players and
+                             entities will be able to walk right through the
+                             respective state of the print. This way you can
+                             have a block that becomes passable when in its
+                             alternate state, or make a secret passage.
+                             The default is true for both states. ]]
                           
   -- This is the list of shapes defining how the model looks. There has to be
   -- at least one shape for the model's inactive state for the model to be
@@ -53,7 +62,11 @@
   -- When looking onto a model, right is positive X, up is positive Y and back
   -- is positive Z.
   -- Additionally, a texture is required per shape. To get a name use the
-  -- Texture Picker tool on blocks in the game.
+  -- Texture Picker tool on blocks in the game. As a special case you may set
+  -- the texture name to an empty string, in which case the shape will be fully
+  -- transparent. You can use this in combination with `collidable` (see above)
+  -- to make a print completely "vanish", as has been requested for special
+  -- door constructions, for example.
   --
   -- Models can have two states, the inactive state, which is the default, and
   -- an optional, active state, which is shown when the block is either
