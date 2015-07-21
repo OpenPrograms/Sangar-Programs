@@ -11,14 +11,9 @@ end
 local sx, sz = 48, 48
 local ox, oz = -24, -24
 local starty, stopy = -5, 27
-local includeReplaceable = false
 
 do
   local args = {...}
-  --local args, options = shell.parse(...)
-  --if options.o then
-  --  includeReplaceable = true
-  --end
   if #args >= 1 then
     local newY = tonumber(args[1])
     if newY then
@@ -52,7 +47,7 @@ component.hologram.clear()
 for x=ox,sx+ox do
   for z=oz,sz+oz do
     local hx, hz = 1 + x - ox, 1 + z - oz
-    local column = component.geolyzer.scan(x, z, includeReplaceable)
+    local column = component.geolyzer.scan(x, z, false)
     local hy = 1
     for y=starty + 1,stopy + 1 do
       local color = 0
