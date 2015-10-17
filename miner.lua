@@ -20,6 +20,7 @@ local computer = require("computer")
 local robot = require("robot")
 local shell = require("shell")
 local sides = require("sides")
+local args, options = shell.parse(...)
 
 --[[ Config ]]-----------------------------------------------------------------
 
@@ -34,6 +35,22 @@ local maxVeinRecursion = 8
 -- Every how many blocks to place a torch when placing torches.
 local torchInverval = 11
 
+--[[ Constants ]]--------------------------------------------------------------
+
+-- Quick look-up table for inverting directions.
+local oppositeSides = {
+  [sides.north] = sides.south,
+  [sides.south] = sides.north,
+  [sides.east] = sides.west,
+  [sides.west] = sides.east,
+  [sides.up] = sides.down,
+  [sides.down] = sides.up
+}
+
+-- For pushTurn() readability.
+local left = false
+local right = not left
+
 --[[ State ]]------------------------------------------------------------------
 
 -- Slots we don't want to drop. Filled in during initialization, based
@@ -43,7 +60,39 @@ local keepSlot = {}
 -- Slots that we keep torches in, updated when stocking up on torches.
 local torchSlots = {}
 
+--[[ "Passive" logic ]]--------------------------------------------------------
+
+-- Keep track of moves we're away from our origin, and average energy used per
+-- move. This is used to compute the threshold at which we have to return to
+-- maintenance to recharge.
+local preMoveEnergy, averageMoveCost, distanceToOrigin = 0, 15, 0
+
+-- The actual callback called in postMove().
+local onMove
+
+-- Called whenever we're about to move, used to compute move cost.
+local function preMove()
+  preMoveEnergy = computer.energy()
+end
+
+-- Called whenever we're done moving, used for automatic torch placement an digging.
+local function postMove()
+  local moveCost = preMoveEnergy - computer.energy()
+  if moveCost > 0 then
+    averageMoveCost = (averageMoveCost + moveCost) / 2
+  end
+  if onMove then
+    onMove()
+  end
+end
+
 --[[ Utility ]]----------------------------------------------------------------
+
+local function prompt(message)
+  io.write(message .. " [Y/n] ")
+  local result = io.read()
+  return result and (result == "" or result:lower() == "y")
+end
 
 -- Check if a block with the specified info should be mined.
 local function shouldMine(info)
@@ -73,39 +122,97 @@ local function findTorchSlot()
   end
 end
 
+-- Since robot.select() is an indirect call, we can speed things up a bit.
+local selectedSlot
+local function cachedSelect(slot)
+  if slot ~= selectedSlot then
+    robot.select(slot)
+    selectedSlot = slot
+  end
+end
+
 -- Place a single torch above the robot, if there are any torches left.
 local function placeTorch()
   local slot = findTorchSlot()
   local result = false
   if slot then
-    robot.select(slot)
+    cachedSelect(slot)
     result = robot.placeUp()
-    robot.select(1)
+    cachedSelect(1)
   end
   return result
 end
 
+-- Dig out a block on the specified side, without tool if possible.
+local function dig(side, callback)
+  repeat
+    -- Check for maintenance first, to make sure we make the return trip when
+    -- our batteries are running low.
+    local emptySlot = findEmptySlot()
+    if callback then
+      callback(not emptySlot) -- Parameter: is inventory full.
+      emptySlot = findEmptySlot()
+    end
+    cachedSelect(1)
+
+    local something, what = component.robot.detect(side)
+    if not something or what == "replaceable" or what == "liquid" then
+      return true -- We can just move into whatever is there.
+    end
+
+    local brokeSomething
+
+    local info = component.isAvailable("geolyzer") and
+                 component.geolyzer.analyze(side)
+    if info and info.name == "OpenComputers:robot" then
+      brokeSomething = true -- Wait for other robot to go away.
+      os.sleep(0.5)
+    elseif component.isAvailable("inventory_controller") and emptySlot then
+      cachedSelect(emptySlot)
+      component.inventory_controller.equip() -- Save some tool durability.
+      cachedSelect(1)
+      brokeSomething = component.robot.swing(side)
+      cachedSelect(emptySlot)
+      component.inventory_controller.equip()
+      cachedSelect(1)
+    end
+    if not brokeSomething then
+      brokeSomething = component.robot.swing(side)
+    end
+  until not brokeSomething
+end
+
+-- Force a move towards in the specified direction.
+local function forceMove(side)
+  preMove()
+  local result = component.robot.move(side)
+  if result then
+    postMove()
+  else
+    -- Obstructed, try to clear the way.
+    if side == sides.back then
+      -- Moving backwards, turn around.
+      component.robot.turn(left)
+      component.robot.turn(left)
+      repeat
+        dig(sides.forward)
+        preMove()
+      until robot.forward()
+      postMove()
+      component.robot.turn(left)
+      component.robot.turn(left)
+    else
+      repeat
+        dig(side)
+        preMove()
+      until component.robot.move(side)
+      postMove()
+    end
+  end
+  return true
+end
+
 --[[ Navigation ]]-------------------------------------------------------------
-
--- Re-used to avoid spamming new closures.
-local function noop() end
-
--- Called whenever we're moving, used for automatic torch placement an digging.
-local onMove = noop
-
--- Quick look-up table for inverting directions.
-local oppositeSides = {
-  [sides.north] = sides.south,
-  [sides.south] = sides.north,
-  [sides.east] = sides.west,
-  [sides.west] = sides.east,
-  [sides.up] = sides.down,
-  [sides.down] = sides.up
-}
-
--- For pushTurn() readability.
-local left = false
-local right = not left
 
 -- Keeps track of our moves to allow "undoing" them for returning to the
 -- docking station. Format is a list of moves, represented as tables
@@ -119,30 +226,13 @@ local moves = {}
 local function undoMove(move)
   if move.move then
     local side = oppositeSides[move.move]
-    local result = component.robot.move(side)
-    if not result then
-      -- Obstructed, try to clear the way.
-      if side == sides.back then
-        -- Moving backwards, turn around.
-        component.robot.turn(left)
-        component.robot.turn(left)
-        repeat
-          robot.swing()
-        until robot.forward()
-        component.robot.turn(left)
-        component.robot.turn(left)
-      else
-        repeat
-          component.robot.swing(side)
-        until component.robot.move(side)
-      end
-    end
+    forceMove(side)
+    distanceToOrigin = distanceToOrigin - 1
   else
     local direction = not move.turn
     component.robot.turn(direction)
   end
   move.count = move.count - 1
-  onMove()
 end
 
 -- Make a turn in the specified direction.
@@ -157,15 +247,17 @@ local function pushTurn(direction)
 end
 
 -- Try to make a move towards the specified side.
-local function pushMove(side)
-  local result, reason = component.robot.move(side)
+local function pushMove(side, force)
+  preMove()
+  local result, reason = (force and forceMove or component.robot.move)(side)
   if result then
     if moves[#moves] and moves[#moves].move == side then
       moves[#moves].count = moves[#moves].count + 1
     else
       moves[#moves + 1] = {move=side, count=1}
     end
-    onMove()
+    distanceToOrigin = distanceToOrigin + 1
+    postMove()
   end
   return result, reason
 end
@@ -196,10 +288,15 @@ end
 
 -- Undo some moves based on a stored top and count received from getTop().
 local function setTop(top, count, unsafe)
-  assert(top >= 0 and top <= #moves)
-  assert(count >= 0 and top < #moves or count <= moves[#moves].count)
+  assert(top >= 0)
+  assert(top <= #moves)
+  assert(count >= 0)
+  assert(top < #moves or count <= moves[#moves].count)
   while #moves > top do
     if unsafe then
+      if moves[#moves].move then
+        distanceToOrigin = distanceToOrigin - moves[#moves].count
+      end
       moves[#moves] = nil
     else
       popMove()
@@ -210,27 +307,13 @@ local function setTop(top, count, unsafe)
     while move.count > count do
       if unsafe then
         move.count = move.count - 1
+        distanceToOrigin = distanceToOrigin - 1
       else
         undoMove(move)
       end
     end
     if move.count < 1 then
       moves[#moves] = nil
-    end
-  end
-end
-
--- Repeat the specified set of moves.
-local function pushMoves(moves)
-  for _, move in ipairs(moves) do
-    if move.move then
-      for _ = 1, move.count do
-        repeat until pushMove(move.move)
-      end
-    else
-      for _ = 1, move.count do
-        pushTurn(move.turn)
-      end
     end
   end
 end
@@ -246,36 +329,54 @@ local function popMoves()
   return result
 end
 
+-- Repeat the specified set of moves.
+local function pushMoves(moves)
+  for _, move in ipairs(moves) do
+    if move.move then
+      for _ = 1, move.count do
+        pushMove(move.move, true)
+      end
+    else
+      for _ = 1, move.count do
+        pushTurn(move.turn)
+      end
+    end
+  end
+end
+
 --[[ Maintenance ]]------------------------------------------------------------
 
--- Go back to the docking bay for general maintenance if necessary.
-local function gotoMaintenance(force)
-  if not force and
-     robot.durability() and
-     computer.energy() / computer.maxEnergy() > 0.1 and
-     findTorchSlot()
-  then
-    return -- No need yet.
-  end
+-- Energy required to return to docking bay.
+local function costToReturn()
+  -- Overestimate a bit, to account for obstacles such as gravel or mobs.
+  return 5000 + averageMoveCost * distanceToOrigin * 1.25
+end
 
-  io.write("Going back for maintenance!\n")
-  local moves = popMoves()
+-- Checks whether we need maintenance.
+local function needsMaintenance()
+  return not robot.durability() or -- Tool broken?
+         computer.energy() < costToReturn() or -- Out of juice?
+         not findTorchSlot() -- No more torches?
+end
 
-  -- Drop inventory.
+-- Drops all inventory contents that are not marked for keeping.
+local function dropMinedBlocks()
   io.write("Dropping what I found.\n")
   for slot = 1, robot.inventorySize() do
     while not keepSlot[slot] and robot.count(slot) > 0 do
-      robot.select(slot)
+      cachedSelect(slot)
       robot.dropDown()
     end
   end
-  robot.select(1)
+  cachedSelect(1)
+end
 
-  -- Make sure we have a working tool.
+-- Ensures we have a tool with durability.
+local function checkTool()
   if not robot.durability() then
     io.write("Tool is broken, getting a new one.\n")
     if component.isAvailable("inventory_controller") then
-      robot.select(findEmptySlot()) -- Select an empty slot for working.
+      cachedSelect(findEmptySlot()) -- Select an empty slot for working.
       repeat
         component.inventory_controller.equip() -- Drop whatever's in the tool slot.
         while robot.count() > 0 do
@@ -284,7 +385,7 @@ local function gotoMaintenance(force)
         robot.suckUp(1) -- Pull something from above and equip it.
         component.inventory_controller.equip()
       until robot.durability()
-      robot.select(1)
+      cachedSelect(1)
     else
       -- Can't re-equip autonomously, wait for player to give us a tool.
       io.write("HALP! I need a new tool.\n")
@@ -293,8 +394,11 @@ local function gotoMaintenance(force)
       until robot.durability()
     end
   end
+end
 
-  -- Stock up on torches. First, clean up our list and look for empty slots.
+-- Ensures we have some torches.
+local function checkTorches()
+  -- First, clean up our list and look for empty slots.
   io.write("Getting my fill of torches.\n")
   local oldTorchSlots = torchSlots
   torchSlots = {}
@@ -316,7 +420,7 @@ local function gotoMaintenance(force)
   for _, slot in ipairs(torchSlots) do
     keepSlot[slot] = true
     if robot.space(slot) > 0 then
-      robot.select(slot)
+      cachedSelect(slot)
       repeat
         local before = robot.space()
         robot.suck(robot.space())
@@ -324,64 +428,74 @@ local function gotoMaintenance(force)
           os.sleep(5) -- Don't busy idle.
         end
       until robot.space() < 1
-      robot.select(1)
+      cachedSelect(1)
     end
   end
   robot.turnRight()
+end
 
-  -- Recharge our batteries. Do this last so we can charge some during the
-  -- other operations.
+-- Recharge our batteries.
+local function recharge()
   io.write("Waiting until my batteries are full.\n")
-  while computer.energy() / computer.maxEnergy() < 0.95 do
-    os.sleep(10)
+  while computer.maxEnergy() - computer.energy() > 100 do
+    os.sleep(1)
+  end
+end
+
+-- Go back to the docking bay for general maintenance if necessary.
+local function gotoMaintenance(force)
+  if not force and not needsMaintenance() then
+    return -- No need yet.
   end
 
+  -- Save some values for later, temporarily remove onMove callback.
+  local returnCost = costToReturn()
+  local moveCallback = onMove
+  onMove = nil
+
+  local top, count = getTop()
+
+  io.write("Going back for maintenance!\n")
+  local moves = popMoves()
+
+  assert(distanceToOrigin == 0)
+
+  dropMinedBlocks()
+  checkTool()
+  checkTorches()
+  recharge() -- Last so we can charge some during the other operations.
+
   if moves and #moves > 0 then
+    if returnCost * 2 > computer.maxEnergy() and
+       not options.f and
+       not prompt("Going back will cost me half my energy. There's a good chance I will not return. Do you want to send me to my doom anyway?")
+    then
+      os.exit()
+    end
     io.write("Returning to where I left off.\n")
     pushMoves(moves)
   end
+
+  local newTop, newCount = getTop()
+  assert(top == newTop)
+  assert(count == newCount)
+
+  onMove = moveCallback
 end
 
 --[[ Mining ]]-----------------------------------------------------------------
 
--- Dig out a block on the specified side, without tool if possible.
-local function dig(side)
-  repeat
-    local something, what = component.robot.detect(side)
-    if not something or what == "replaceable" or what == "liquid" then
-      return true -- We can just move into whatever is there.
-    end
-
-    local emptySlot = findEmptySlot()
-    gotoMaintenance(not emptySlot) -- Go back to base if necessary.
-
-    local brokeSomething
-
-    local info = component.isAvailable("geolyzer") and
-                 component.geolyzer.analyze(side)
-    if info and info.name == "OpenComputers:robot" then
-      brokeSomething = true -- Wait for other robot to go away.
-      os.sleep(0.5)
-    elseif component.isAvailable("inventory_controller") then
-      robot.select(emptySlot or 1)
-      component.inventory_controller.equip() -- Save some tool durability.
-      brokeSomething = component.robot.swing(side)
-      component.inventory_controller.equip()
-    end
-    if not brokeSomething then
-      robot.select(1)
-      brokeSomething = component.robot.swing(side)
-    end
-  until not brokeSomething
-end
-
 -- Move towards the specified direction, digging out blocks as necessary.
+-- This is a "soft" version of forceMove in that it will try to clear its path,
+-- but fail if it can't.
 local function move(side)
   local result, reason, retry
   repeat
     retry = false
     if side ~= sides.back then
-      retry = dig(side)
+      retry = dig(side, gotoMaintenance)
+    else
+      gotoMaintenance()
     end
     result, reason = pushMove(side)
   until result or not retry
@@ -419,13 +533,13 @@ end
 -- Start digging out the block below us after each move.
 local function beginDigginTrench()
   onMove = function()
-    dig(sides.down)
+    dig(sides.down, gotoMaintenance)
   end
 end
 
 -- Stop automatically placing torches.
 local function clearMoveCallback()
-  onMove = noop
+  onMove = nil
 end
 
 --[[ Moving ]]-----------------------------------------------------------------
@@ -469,7 +583,7 @@ end
 -- POST: at the end of the tunnel.
 local function dig1x2(length, exhaustive)
   while length > 0 and move(sides.forward) do
-    dig(sides.up)
+    dig(sides.up, gotoMaintenance)
     digVeins(exhaustive)
     length = length - 1
   end
@@ -481,8 +595,8 @@ end
 -- POST: at the end of the tunnel.
 local function dig1x3(length)
   while length > 0 and move(sides.forward) do
-    dig(sides.up)
-    dig(sides.down)
+    dig(sides.up, gotoMaintenance)
+    dig(sides.down, gotoMaintenance)
     length = length - 1
   end
   return length < 1
@@ -635,6 +749,9 @@ local function main(radius, levels, full)
       end
       digShafts(radius)
     end
+    if full then
+      gotoNextMainShaft() -- Finish the circle.
+    end
 
     setTop(top, count)
   end
@@ -644,9 +761,12 @@ local function main(radius, levels, full)
   gotoMaintenance(true)
 end
 
-local args, options = shell.parse(...)
 if options.h or options.help then
-  io.write("Usage: miner [radius [levels [full]]]\n")
+  io.write("Usage: miner [-hsf] [radius [levels [full]]]\n")
+  io.write("  -h:     this help listing.\n")
+  io.write("  -s:     start without prompting.\n")
+  io.write("  -f:     force mining to continue even if max\n")
+  io.write("          fuel may be insufficient to return.\n")
   io.write("  radius: the radius in blocks of the area to\n")
   io.write("          mine. Adjusted to be a multiple of\n")
   io.write("          three. Default: 9.\n")
@@ -680,8 +800,8 @@ else
   io.write("You'll need to manually provide me with new tools if they break.\n")
 end
 
-io.write("Shall we begin? [Y/n] ")
-local result = io.read()
-if result and result == "" or result:lower() == "y" then
+io.write("Run with -h or --help for parameter info.\n")
+
+if options.s or prompt("Shall we begin?") then
   main(radius, levels, full)
 end
