@@ -183,10 +183,11 @@ local function dig(side, callback)
 end
 
 -- Force a move towards in the specified direction.
-local function forceMove(side)
+local function forceMove(side, delta)
   preMove()
   local result = component.robot.move(side)
   if result then
+    distanceToOrigin = distanceToOrigin + delta
     postMove()
   else
     -- Obstructed, try to clear the way.
@@ -198,14 +199,17 @@ local function forceMove(side)
         dig(sides.forward)
         preMove()
       until robot.forward()
-      postMove()
+      distanceToOrigin = distanceToOrigin + delta
       component.robot.turn(left)
       component.robot.turn(left)
+      postMove() -- Slightly falsifies move cost, but must ensure we're rotated
+                 -- correctly in case postMove() triggers going to maintenance.
     else
       repeat
         dig(side)
         preMove()
       until component.robot.move(side)
+      distanceToOrigin = distanceToOrigin + delta
       postMove()
     end
   end
@@ -226,8 +230,7 @@ local moves = {}
 local function undoMove(move)
   if move.move then
     local side = oppositeSides[move.move]
-    forceMove(side)
-    distanceToOrigin = distanceToOrigin - 1
+    forceMove(side, -1)
   else
     local direction = not move.turn
     component.robot.turn(direction)
@@ -249,14 +252,16 @@ end
 -- Try to make a move towards the specified side.
 local function pushMove(side, force)
   preMove()
-  local result, reason = (force and forceMove or component.robot.move)(side)
+  local result, reason = (force and forceMove or component.robot.move)(side, 1)
   if result then
     if moves[#moves] and moves[#moves].move == side then
       moves[#moves].count = moves[#moves].count + 1
     else
       moves[#moves + 1] = {move=side, count=1}
     end
-    distanceToOrigin = distanceToOrigin + 1
+    if not force then
+      distanceToOrigin = distanceToOrigin + 1
+    end
     postMove()
   end
   return result, reason
@@ -361,6 +366,12 @@ end
 
 -- Drops all inventory contents that are not marked for keeping.
 local function dropMinedBlocks()
+  if component.isAvailable("inventory_controller") then
+    if not component.inventory_controller.getInventorySize(sides.down) then
+      io.write("There doesn't seem to be an inventory below me! Waiting to avoid spilling stuffs into the world.\n")
+    end
+    repeat os.sleep(5) until component.inventory_controller.getInventorySize(sides.down)
+  end
   io.write("Dropping what I found.\n")
   for slot = 1, robot.inventorySize() do
     while not keepSlot[slot] and robot.count(slot) > 0 do
