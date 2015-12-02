@@ -1,6 +1,16 @@
 local component = require("component")
 local shell = require("shell")
 
+adr = {}
+c=1
+for adress, type in component.list("print") do table.insert(adr, adress) print(c .. " - " .. adress) c = c+1 end
+if #adr~=0 then
+  io.write("Choose printer:  ")
+  pt = io.read("*n")
+  p = pt
+  component.setPrimary("printer3d", adr[p])
+end
+
 local printer = component.printer3d
 
 local args = shell.parse(...)
