@@ -1,14 +1,21 @@
 local component = require("component")
 local shell = require("shell")
 
-adr = {}
-c=1
-for adress, type in component.list("print") do table.insert(adr, adress) print(c .. " - " .. adress) c = c+1 end
-if #adr~=0 then
-  io.write("Choose printer:  ")
-  pt = io.read("*n")
-  p = pt
-  component.setPrimary("printer3d", adr[p])
+addresses = {}
+for address in component.list("printer3d") do
+  table.insert(addresses, address)
+  print(#addresses .. ": " .. address)
+end
+if #addresses > 1 then
+  io.write("Choose printer: ")
+  local index
+  repeat
+    index = tonumber(io.read("*n"))
+    if not (index and addresses[index]) then
+      io.write("\nInvalid index!\nChoose printer: ")
+    end
+  until index and addresses[index]
+  component.setPrimary("printer3d", addresses[index])
 end
 
 local printer = component.printer3d
