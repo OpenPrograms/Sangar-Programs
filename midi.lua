@@ -1,6 +1,7 @@
 local component = require("component")
 local computer = require("computer")
 local shell = require("shell")
+local keyboard = require("keyboard")
 
 local args, options = shell.parse(...)
 if #args < 1 then
@@ -28,10 +29,24 @@ for address in component.list("note_block") do
   end)
 end
 if #instruments == 0 then
-  print("No note blocks found, falling back to built-in speaker.")
-  instruments[1] = function(note)
-    pcall(computer.beep, math.pow(2, (note - 69) / 12) * 440, 0.05)
-    return true -- only one event per tick
+  if component.isAvailable("beep") then
+    print("No note blocks found, falling back to beep card.")
+    local notes = {}
+    instruments[1] = function(note, duration)
+      notes[math.pow(2, (note - 69) / 12) * 440] = duration or 0.05
+    end
+    instruments.flush = function()
+      component.beep.beep(notes)
+      for k, v in pairs(notes) do
+        notes[k] = nil
+      end
+    end
+  else
+    print("No note blocks or beep card found, falling back to built-in speaker.")
+    instruments[1] = function(note, duration)
+      pcall(computer.beep, math.pow(2, (note - 69) / 12) * 440, duration or 0.05)
+      return true -- only one event per tick
+    end
   end
 else
   print("Using " .. #instruments .. " note blocks.")
@@ -106,6 +121,9 @@ else
   end
   print(string.format("Time division is in %d frames per second with %d ticks per frame.", time.fps, time.tpf))
 end
+function time.calcDelay(later, earlier)
+  return (later - earlier) * time.tick() / 1000000
+end
 
 -- Parse all track chunks.
 local totalOffset = 0
@@ -146,6 +164,20 @@ while true do
       local velocity = parseVarInt(read())
       return channel, note, velocity
     end
+    local currentNoteEvents = {}
+    local function noteOn(cursor, channel, note, velocity)
+      track[cursor] = {channel, note, velocity}
+      if not currentNoteEvents[channel] then
+        currentNoteEvents[channel] = {}
+      end
+      currentNoteEvents[channel][note] = {event=track[cursor], tick=cursor}
+    end
+    local function noteOff(cursor, channel, note, velocity)
+      if not (currentNoteEvents[channel] and currentNoteEvents[channel][note]) then return end
+      table.insert(currentNoteEvents[channel][note].event
+          , time.calcDelay(cursor, currentNoteEvents[channel][note].tick))
+      currentNoteEvents[channel][note] = nil
+    end
 
     while offset < size do
       cursor = cursor + readVariableLength()
@@ -170,10 +202,15 @@ while true do
       end
       local status = bit32.band(0xF0, event)
       if status == 0x80 then -- Note off.
-        parseVoiceMessage(event) -- not handled
+        local channel, note, velocity = parseVoiceMessage(event)
+        noteOff(cursor, channel, note, velocity)
       elseif status == 0x90 then -- Note on.
         local channel, note, velocity = parseVoiceMessage(event)
-        track[cursor] = {channel, note, velocity}
+        if velocity == 0 then
+          noteOff(cursor, channel, note, velocity)
+        else
+          noteOn(cursor, channel, note, velocity)
+        end
       elseif status == 0xA0 then -- Aftertouch / key pressure
         parseVoiceMessage(event) -- not handled
       elseif status == 0xB0 then -- Controller
@@ -246,6 +283,12 @@ while true do
         error(string.format("midi file contains unhandled event types:\n0x%X at offset %d/%d\ndump of the surrounding area:\n%s", event, offset, size, dump))
       end
     end
+    -- turn off any remaining notes
+    for iChannel, iNotes in pairs(currentNoteEvents) do
+      for iNote, iEntry in pairs(currentNoteEvents[iChannel]) do
+        noteOff(cursor, iChannel, iNote)
+      end
+    end
     local delta = size - offset
     if delta ~= 0 then
       f:seek("cur", delta)
@@ -288,6 +331,7 @@ end
 
 local channels = {n=0}
 local lastTick, lastTime = 0, computer.uptime()
+print("Press Ctrl+C to exit.")
 for tick = 1, totalLength do
   local hasEvent = false
   for _, track in ipairs(tracks) do
@@ -297,7 +341,7 @@ for tick = 1, totalLength do
     end
   end
   if hasEvent then
-    local delay = (tick - lastTick) * time.tick() / 1000000
+    local delay = time.calcDelay(tick, lastTick)
     if delay > 0.05 or computer.uptime() then
       os.sleep(delay)
     else
@@ -313,17 +357,19 @@ for tick = 1, totalLength do
         if type(event) == "number" then
           time.mspb = event
         elseif type(event) == "table" then
-          local channel, note, velocity = table.unpack(event)
+          local channel, note, velocity, duration = table.unpack(event)
           local instrument
           if not channels[channel] then
             channels.n = channels.n + 1
             channels[channel] = instruments[1 + (channels.n % #instruments)]
           end
-          if channels[channel](note) then
+          if channels[channel](note, duration) then
             break
           end
         end
       end
     end
+    if instruments.flush then instruments.flush() end
   end
+  if keyboard.isKeyDown(keyboard.keys.c) and keyboard.isControlDown() then os.exit() end
 end
