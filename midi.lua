@@ -342,7 +342,8 @@ for tick = 1, totalLength do
   end
   if hasEvent then
     local delay = time.calcDelay(tick, lastTick)
-    if delay > 0.05 or computer.uptime() then
+    -- delay % 0.05 == 0 doesn't seem to work
+    if math.floor(delay * 100 + 0.5) % 5 == 0 then
       os.sleep(delay)
     else
       -- Busy idle otherwise, because a sleep will take up to 50ms.
