@@ -2,6 +2,7 @@ local component = require("component")
 local computer = require("computer")
 local shell = require("shell")
 local keyboard = require("keyboard")
+local note = require("note")
 
 local args, options = shell.parse(...)
 if #args < 1 then
@@ -29,11 +30,19 @@ for address in component.list("note_block") do
   end)
 end
 if #instruments == 0 then
+  local function beepableFrequency(midiCode)
+    local freq = note.freq(midiCode)
+    if freq <= 0 then error("Nonpositive frequency") end
+    -- shift it by octaves so we at least get the right pitch
+    while freq < 20 do freq = freq * 2 end
+    while freq > 2000 do freq = freq / 2 end
+    return freq
+  end
   if component.isAvailable("beep") then
     print("No note blocks found, falling back to beep card.")
     local notes = {}
     instruments[1] = function(note, duration)
-      notes[math.pow(2, (note - 69) / 12) * 440] = duration or 0.05
+      notes[beepableFrequency(note)] = duration or 0.05
     end
     instruments.flush = function()
       component.beep.beep(notes)
@@ -44,7 +53,7 @@ if #instruments == 0 then
   else
     print("No note blocks or beep card found, falling back to built-in speaker.")
     instruments[1] = function(note, duration)
-      pcall(computer.beep, math.pow(2, (note - 69) / 12) * 440, duration or 0.05)
+      pcall(computer.beep, beepableFrequency(note), duration or 0.05)
       return true -- only one event per tick
     end
   end
