@@ -42,7 +42,7 @@
                              like a button.
                              The default is false. ]]
 
-  collidable = {true, true} --[[ Determines whether the states of the print are
+  collidable = {true, true}, --[[ Determines whether the states of the print are
                              collidable, i.e. whether players and other
                              entities collide with them. If false, players and
                              entities will be able to walk right through the
