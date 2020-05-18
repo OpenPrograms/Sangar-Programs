@@ -74,10 +74,10 @@ local function parseVarInt(s, bits) -- parses multiple bytes as an integer
     error("error parsing file")
   end
   bits = bits or 8
-  local mask = bit32.rshift(0xFF, 8 - bits)
+  local mask = 0xFF >> 8 - bits
   local num = 0
   for i = 1, s:len() do
-    num = num + bit32.lshift(bit32.band(s:byte(i), mask), (s:len() - i) * bits)
+    num = num + s:byte(i) & mask << (s:len() - i) * bits
   end
   return num
 end
@@ -115,17 +115,17 @@ if format == 2 then
 end
 
 -- Figure out our time system and prepare accordingly.
-local time = {division = bit32.band(0x8000, delta) == 0 and "tpb" or "fps"}
+local time = {division = 0x8000 & delta == 0 and "tpb" or "fps"}
 if time.division == "tpb" then
-  time.tpb = bit32.band(0x7FFF, delta)
+  time.tpb = 0x7FFF & delta
   time.mspb = 500000
   function time.tick()
     return time.mspb / time.tpb
   end
   print(string.format("Time division is in %d ticks per beat.", time.tpb))
 else
-  time.fps = bit32.band(0x7F00, delta)
-  time.tpf = bit32.band(0x00FF, delta)
+  time.fps = 0x7F00 & delta
+  time.tpf = 0x00FF & delta
   function time.tick()
     return 1000000 / (time.fps * time.tpf)
   end
@@ -163,13 +163,13 @@ while true do
       for i = 1, math.huge do
         local part = read()
         total = total .. part
-        if bit32.band(0x80, part:byte(1)) == 0 then
+        if 0x80 & part:byte(1) == 0 then
           return parseVarInt(total, 7)
         end
       end
     end
     local function parseVoiceMessage(event)
-      local channel = bit32.band(0xF, event)
+      local channel = 0xF & event
       local note = parseVarInt(read())
       local velocity = parseVarInt(read())
       return channel, note, velocity
@@ -197,7 +197,7 @@ while true do
         error("corrupt file: could not find continuation of divided sysex event")
       end
       local event
-      if bit32.band(test, 0x80) == 0 then
+      if test & 0x80 == 0 then
         if running == 0 then
           error("corrupt file: invalid running status")
         end
@@ -210,7 +210,7 @@ while true do
           running = test
         end
       end
-      local status = bit32.band(0xF0, event)
+      local status = 0xF0 & event
       if status == 0x80 then -- Note off.
         local channel, note, velocity = parseVoiceMessage(event)
         noteOff(cursor, channel, note, velocity)
