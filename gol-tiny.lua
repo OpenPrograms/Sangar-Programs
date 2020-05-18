@@ -47,7 +47,7 @@ local function flush()
     for x = 1, w do
       row = row .. gpu.get(x, y)
     end
-    final = row:gsub(on2off, off):gsub(off2on, on)
+    local final = row:gsub(on2off, off):gsub(off2on, on)
     if final ~= row then
       gpu.set(1, y, final)
     end

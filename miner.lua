@@ -20,6 +20,7 @@ local computer = require("computer")
 local robot = require("robot")
 local shell = require("shell")
 local sides = require("sides")
+local event = require("event")
 local args, options = shell.parse(...)
 
 --[[ Config ]]-----------------------------------------------------------------
@@ -560,12 +561,13 @@ end
 local function digVein(maxDepth)
   if maxDepth < 1 then return end
   for _, side in ipairs(sides) do
-    side = sides[side]
-    if shouldMine(component.geolyzer.analyze(side)) then
+    local sideIdx = sides[side]
+    -- skip unknown side
+    if oppositeSides[side] and shouldMine(component.geolyzer.analyze(sideIdx)) then
       local top, count = getTop()
-      turnTowards(side)
-      if side == sides.up or side == sides.down then
-        move(side)
+      turnTowards(sideIdx)
+      if sideIdx == sides.up or sideIdx == sides.down then
+        move(sideIdx)
       else
         move(sides.forward)
       end
