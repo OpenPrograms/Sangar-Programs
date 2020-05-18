@@ -3,6 +3,7 @@ local computer = require("computer")
 local shell = require("shell")
 local keyboard = require("keyboard")
 local note = require("note")
+local bit32 = require("bit32")
 
 local args, options = shell.parse(...)
 if #args < 1 then

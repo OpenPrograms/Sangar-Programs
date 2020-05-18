@@ -215,7 +215,7 @@ function Sexpr.prettyPrint(sexpr, inList)
   return pretty
 end
 
-parser = {
+local parser = {
   operators = {
     ["("] = true, [")"] = true,
     [","] = true, ["'"] = true,
@@ -281,7 +281,7 @@ end
 -- Parse a sub expression, returning both an expression and
 -- the index following this sub expression.
 function parser.parseTokens(expr)
-  tokens = {}
+  local tokens = {}
   -- We do it character by character, using queues to
   -- handle strings as well as regular lexemes
   local currentToken = {}

@@ -1,7 +1,7 @@
 local component = require("component")
 local shell = require("shell")
 
-addresses = {}
+local addresses = {}
 for address in component.list("printer3d") do
   table.insert(addresses, address)
   print(#addresses .. ": " .. address)
